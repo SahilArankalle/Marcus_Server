@@ -1,1 +1,2 @@
-websockets
+Flask==2.3.0
+websockets==11.0.2

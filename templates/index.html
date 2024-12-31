@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Client</title>
+</head>
+<body>
+    <h2>WebSocket Client Interface</h2>
+    <div>
+        <button id="connectButton">Connect</button>
+        <button id="signupButton">Signup</button>
+        <button id="loginButton">Login</button>
+        <button id="sendCommandButton">Send Command</button>
+    </div>
+    <div id="status"></div>
+
+    <script>
+        let socket;
+        let username = "";
+
+        // Function to open a WebSocket connection
+        document.getElementById('connectButton').onclick = () => {
+            socket = new WebSocket('ws://localhost:12345');
+            
+            socket.onopen = () => {
+                document.getElementById('status').innerText = "Connected to WebSocket server!";
+            };
+
+            socket.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                document.getElementById('status').innerText = message.message;
+            };
+            
+            socket.onclose = () => {
+                document.getElementById('status').innerText = "Disconnected from WebSocket server.";
+            };
+        };
+
+        // Signup button handler
+        document.getElementById('signupButton').onclick = () => {
+            const data = {
+                action: "signup",
+                username: "newUser",
+                password: "password123"
+            };
+            socket.send(JSON.stringify(data));
+        };
+
+        // Login button handler
+        document.getElementById('loginButton').onclick = () => {
+            const data = {
+                action: "login",
+                username: "newUser",
+                password: "password123"
+            };
+            socket.send(JSON.stringify(data));
+        };
+
+        // Send command button handler
+        document.getElementById('sendCommandButton').onclick = () => {
+            const data = {
+                action: "command",
+                command: "Some command"
+            };
+            socket.send(JSON.stringify(data));
+        };
+    </script>
+</body>
+</html>

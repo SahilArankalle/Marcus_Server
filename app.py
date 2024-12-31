@@ -1,23 +1,25 @@
 import asyncio
 import websockets
 import json
+from flask import Flask, render_template
+from threading import Thread
 
-user_db = {}  # Store user credentials (username, password)
-signup_count = {}  # Track the number of signups per device (based on WebSocket remote address)
-MAX_USERS_PER_DEVICE = 3  # Maximum allowed users per device
-clients = {}  # Dictionary to store connected clients with their WebSocket references (using username)
+user_db = {}
+signup_count = {}
+MAX_USERS_PER_DEVICE = 3
+clients = {}
+
+app = Flask(__name__)
 
 # Handler for each WebSocket connection
 async def handle_connection(websocket, path):
     try:
-        device_id = websocket.remote_address[0]  # Use IP address as device ID
+        device_id = websocket.remote_address[0]
         print(f"A client connected from {device_id}!")
 
-        # Send success message to the client
         await websocket.send(json.dumps({"status": "success", "message": "Connected to server!"}))
 
-        # Add connected client to the clients dictionary, with websocket as value
-        username = None  # Initialize username to None to associate after login/signup
+        username = None
         async for message in websocket:
             data = json.loads(message)
             action = data.get("action")
@@ -26,7 +28,7 @@ async def handle_connection(websocket, path):
                 await handle_signup(data, websocket, device_id)
             elif action == "login":
                 username = await handle_login(data, websocket)
-                if username:  # If login is successful, associate this username with the websocket
+                if username:
                     clients[username] = websocket
             elif action == "command":
                 await handle_command(data)
@@ -34,7 +36,6 @@ async def handle_connection(websocket, path):
     except websockets.exceptions.ConnectionClosed:
         print("A client disconnected.")
     finally:
-        # Clean up the client from the dictionary if they disconnected
         if username and username in clients:
             del clients[username]
 
@@ -47,7 +48,6 @@ async def handle_signup(data, websocket, device_id):
         await websocket.send(json.dumps({"status": "error", "message": "Invalid input"}))
         return
 
-    # Check the signup limit for the device
     device_signups = signup_count.get(device_id, 0)
     if device_signups >= MAX_USERS_PER_DEVICE:
         await websocket.send(json.dumps({"status": "error", "message": "Signup limit reached for this device"}))
@@ -69,23 +69,22 @@ async def handle_login(data, websocket):
 
     if not username or not password:
         await websocket.send(json.dumps({"status": "error", "message": "Invalid input"}))
-        return None  # Return None if login fails
+        return None
 
     stored_password = user_db.get(username)
 
     if stored_password == password:
         await websocket.send(json.dumps({"status": "success", "message": "Login successful", "username": username}))
-        return username  # Return the username if login is successful
+        return username
     else:
         await websocket.send(json.dumps({"status": "error", "message": "Invalid username or password"}))
-        return None  # Return None if login fails
+        return None
 
 # Handle command received from Raspberry Pi
 async def handle_command(data):
     command = data.get("command")
     print(f"Received command: {command}")
 
-    # Forward the command to all connected Android clients
     if clients:
         for username, client in clients.items():
             await client.send(json.dumps({"action": "command", "command": command}))
@@ -93,11 +92,24 @@ async def handle_command(data):
     else:
         print("No connected clients to forward command to.")
 
-# Start WebSocket server
-async def main():
+# WebSocket server
+async def websocket_server():
     async with websockets.serve(handle_connection, "0.0.0.0", 12345):
-        print("Server started on ws://0.0.0.0:12345")
-        await asyncio.Future()  # Run the server forever
+        print("WebSocket server started on ws://0.0.0.0:12345")
+        await asyncio.Future()
 
-# Run the server
-asyncio.run(main())
+# Start Flask app
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+def start_flask():
+    app.run(host='0.0.0.0', port=5000)
+
+if __name__ == "__main__":
+    # Run both the Flask server and WebSocket server in separate threads
+    flask_thread = Thread(target=start_flask)
+    flask_thread.start()
+
+    # Run WebSocket server in the main thread
+    asyncio.run(websocket_server())

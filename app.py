@@ -61,5 +61,5 @@ async def main():
         print("Server started at ws://0.0.0.0:8765")
         await asyncio.Future()  # Run forever
 
-if __name__ == "__main__":
+if _name_ == "_main_":
     asyncio.run(main())
